@@ -5,10 +5,11 @@ import { Types } from "mongoose";
 
 connect()
 
-export const GET = async(req: NextRequest, { params }: { params: { slug: string } }) => {
+export const GET = async(req: NextRequest, { params }:{ params:  Promise<{ slug: string }> }) => {
     try {
         // Get the ideaId from the dynamic route parameter, not searchParams
-        const ideaId = params.slug
+        const { slug } = await params; // 👈 await the params 
+        const ideaId = slug;
         
         if (!ideaId || !Types.ObjectId.isValid(ideaId)) {
             return new NextResponse(JSON.stringify({ message: "Idea id is invalid" }), { status: 400 })
