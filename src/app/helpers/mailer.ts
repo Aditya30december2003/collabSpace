@@ -1,45 +1,65 @@
-import nodemailer from 'nodemailer'
-import User from '../lib/modals/user';
-import bcryptjs from 'bcryptjs'
+// src/app/helpers/mailer.ts
+import nodemailer, { SentMessageInfo } from "nodemailer";
+import SMTPTransport from "nodemailer/lib/smtp-transport";
+import User from "../lib/modals/user";
+import bcryptjs from "bcryptjs";
 
-export const sendEmail=async({email, emailType ,userId}:any)=>{
-  try {
-// configure mail for usage
-const hashedToken= await bcryptjs.hash(userId.toString() , 10)
+type EmailType = "VERIFY" | "RESET";
 
-if(emailType==="VERIFY"){
-  await User.findByIdAndUpdate(userId ,{
-    $set:{
-       verifyToken:hashedToken , verifyTokenExpiry:Date.now()+3600000
-    }
-  })
-} else if(emailType==="RESET"){
-  await User.findByIdAndUpdate(userId , {
-    $set:{
-     forgetPasswordToken:hashedToken , forgetPasswordTokenExpiry:Date.now()+3600000
-    }
-  })
+interface SendEmailArgs {
+  email: string;
+  emailType: EmailType;
+  userId: string;
 }
 
-// Looking to send emails in production? Check out our Email API/SMTP product!
-const transport = nodemailer.createTransport({
-  host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
-  auth: {
-    user: "6649d0d8c7a2ce", // 🔥🔥
-    pass: "1c98f8ed9c0b5a", // 🔥🔥
-  }
-});
+export const sendEmail = async ({
+  email,
+  emailType,
+  userId,
+}: SendEmailArgs): Promise<SentMessageInfo> => {
+  // hash the userId to use as token
+  const hashedToken = await bcryptjs.hash(userId, 10);
 
- const mailOptions={
-    from: 'adityasmjain@gmail.com',
+  if (emailType === "VERIFY") {
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        verifyToken: hashedToken,
+        verifyTokenExpiry: Date.now() + 3600000, // 1h
+      },
+    });
+  } else {
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        forgetPasswordToken: hashedToken,
+        forgetPasswordTokenExpiry: Date.now() + 3600000, // 1h
+      },
+    });
+  }
+
+  // Use env vars in production — do NOT commit credentials
+  const transport: nodemailer.Transporter<SMTPTransport.SentMessageInfo> =
+    nodemailer.createTransport({
+      host: process.env.MAIL_HOST ?? "sandbox.smtp.mailtrap.io",
+      port: Number(process.env.MAIL_PORT ?? 2525),
+      auth: {
+        user: process.env.MAIL_USER ?? "", // <-- move secrets to .env
+        pass: process.env.MAIL_PASS ?? "",
+      },
+    });
+
+  const actionText =
+    emailType === "VERIFY" ? "verify your email" : "reset your password";
+  const urlPath = emailType === "VERIFY" ? "verifyEmail" : "resetPassword";
+
+  const domain = process.env.DOMAIN ?? "http://localhost:3000";
+
+  const mailOptions = {
+    from: process.env.MAIL_FROM ?? "no-reply@example.com",
     to: email,
-    subject: emailType==="VERIFY" ? "Verify your email":"Reset your password",
-    html: `<b>Click <a href="${process.env.DOMAIN}/verifyEmail?token=${hashedToken}">here</a> to ${emailType ==="VERIFY"?"verify your email." :"reset your password."}</b>`, // HTML body
- }
- const mailResponse = await transport.sendMail(mailOptions)
- return mailResponse
-  } catch (error:any) {
-    throw new Error(error.message)
-  }
-}
+    subject: emailType === "VERIFY" ? "Verify your email" : "Reset your password",
+    html: `<b>Click <a href="${domain}/${urlPath}?token=${hashedToken}">here</a> to ${actionText}.</b>`,
+  };
+
+  const mailResponse = await transport.sendMail(mailOptions);
+  return mailResponse;
+};
