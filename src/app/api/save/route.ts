@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { connect } from "@/app/lib/db";
 import Save from "@/app/lib/modals/saved";
 import { Types } from "mongoose";
-import Idea from "@/app/lib/modals/idea";
 
 connect();
 

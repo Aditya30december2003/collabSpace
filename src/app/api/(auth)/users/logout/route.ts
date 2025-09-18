@@ -1,9 +1,5 @@
-import { NextResponse , NextRequest } from "next/server";
+import { NextResponse} from "next/server";
 import {connect} from '@/app/lib/db'
-import User from "@/app/lib/modals/user";
-import bcrypt from "bcryptjs";
-import { sendEmail } from "@/app/helpers/mailer";
-import jwt from 'jsonwebtoken'
 
 connect()
 
